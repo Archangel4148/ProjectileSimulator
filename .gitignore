@@ -1,3 +1,6 @@
-.idea/
 Pipfile
 Pipfile.lock
+
+# PyCharm
+.idea/
+__pycache__/
