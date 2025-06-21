@@ -79,11 +79,11 @@ def plot_projectile_motion(projectiles: list[Projectile], motion_data: list[Moti
     # Landmarks
     for i, projectile in enumerate(projectiles):
         ax.scatter(motion_data[i].x[0], motion_data[i].y[0], color=colors[i], marker='o',
-                   label=f"{projectile.name} Initial Position")
+                   label=f"{projectile.name} Initial Position", zorder=3)
         ax.scatter(motion_data[i].x[-1], motion_data[i].y[-1], color=colors[i], marker='x',
-                   label=f"{projectile.name} Final Position")
+                   label=f"{projectile.name} Final Position", zorder=3)
         ax.scatter(motion_data[i].peak[0], motion_data[i].peak[1], color=colors[i], marker='^',
-                   label=f"{projectile.name} Peak Height")
+                   label=f"{projectile.name} Peak Height", zorder=3)
 
     ax.legend()
 
