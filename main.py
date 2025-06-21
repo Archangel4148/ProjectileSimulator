@@ -1,19 +1,45 @@
-from projectile_tools import Projectile, animate_projectile_motion
+from projectile_tools import Projectile, plot_projectile_motion
 
-projectile = Projectile(
-    name="Car",
-    x_0=0,
-    y_0=0,
-    v_x0=20,
-    v_y0=5,
-    a_x=0,
-    a_y=-9.8,
-)
+projectiles = [
+    Projectile(
+        name="Ball",
+        x_0=0,
+        y_0=0,
+        v_x0=20,
+        v_y0=5,
+        a_x=0,
+        a_y=-9.8,
+    ),
+    Projectile(
+        name="Wrench",
+        x_0=0,
+        y_0=0,
+        v_x0=20,
+        v_y0=3,
+        a_x=0,
+        a_y=-9.8,
+    ),
+    Projectile(
+        name="Josh",
+        x_0=20,
+        y_0=1,
+        v_x0=-40,
+        v_y0=1,
+        a_x=0,
+        a_y=-9.8,
+    ),
+]
+colors = ["red", "blue", "green"]
 
 # Time constants
-simulation_fps = 30
-simulation_time = 5
+simulation_steps = 200
+simulation_time = 2
 
-position_data = projectile.get_projectile_motion_steps(0, simulation_time, 1 / simulation_fps, 0)
+# Simulate projectile motion and store data
+all_position_data = [
+    projectile.get_projectile_motion_steps(0, simulation_time, simulation_time / simulation_steps, 0) for projectile in
+    projectiles
+]
 
-animate_projectile_motion(projectile, position_data, fps=simulation_fps)
+# animate_projectile_motion([car], all_position_data, fps=simulation_fps)
+plot_projectile_motion(projectiles, all_position_data, colors, plot_steps=False)

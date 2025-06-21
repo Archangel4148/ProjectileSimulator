@@ -48,33 +48,48 @@ class Projectile:
         )
 
 
-def setup_projectile_plot(ax, projectile: Projectile, motion_data: MotionData):
-    max_x, max_y = max(motion_data.x), max(motion_data.y)
-    min_x, min_y = min(motion_data.x), min(motion_data.y)
+def setup_projectile_plot(ax, projectiles: list[Projectile], motion_data: list[MotionData]):
+    # Find min/max bounds for plot
+    max_x = max(max(data.x) for data in motion_data)
+    min_x = min(min(data.x) for data in motion_data)
+    max_y = max(max(data.y) for data in motion_data)
+    min_y = min(min(data.y) for data in motion_data)
+
     ax.set_xlim(min_x - max_x * 0.1, max_x * 1.1)
     ax.set_ylim(min_y - max_y * 0.1, max_y * 1.1)
     ax.set_xlabel("x (m)")
     ax.set_ylabel("y (m)")
-    ax.set_title(f"Motion of {projectile.name}")
+    ax.set_title(f"Motion of {projectiles[0].name if len(projectiles) == 1 else 'Projectiles'}")
     ax.grid(True)
-
-    # Static elements
-    ax.scatter(projectile.x_0, projectile.y_0, color='red', label="Initial Position")
-    ax.scatter(motion_data.x[-1], motion_data.y[-1], color='blue', label="Final Position")
-    ax.scatter(*motion_data.peak, color='green', marker='x', label="Peak Height")
     ax.legend()
 
 
-def plot_projectile_motion(projectile: Projectile, motion_data: MotionData):
+def plot_projectile_motion(projectiles: list[Projectile], motion_data: list[MotionData], colors: list[str],
+                           plot_steps: bool = False):
     fig, ax = plt.subplots()
-    setup_projectile_plot(ax, projectile, motion_data)
-    ax.plot(motion_data.x, motion_data.y, color='black')
+    setup_projectile_plot(ax, projectiles, motion_data)
+    # Trajectory
+    for i, projectile in enumerate(projectiles):
+        ax.plot(motion_data[i].x, motion_data[i].y, color='black')
+        if plot_steps:
+            plt.scatter(motion_data[i].x, motion_data[i].y, color='black', s=3)
+
+    # Landmarks
+    for i, projectile in enumerate(projectiles):
+        ax.scatter(motion_data[i].x[0], motion_data[i].y[0], color=colors[i], marker='o',
+                   label=f"{projectile.name} Initial Position")
+        ax.scatter(motion_data[i].x[-1], motion_data[i].y[-1], color=colors[i], marker='x',
+                   label=f"{projectile.name} Final Position")
+        ax.scatter(motion_data[i].peak[0], motion_data[i].peak[1], color=colors[i], marker='^',
+                   label=f"{projectile.name} Peak Height")
+
+    plt.legend()
     plt.show()
 
 
-def animate_projectile_motion(projectile: Projectile, motion_data: MotionData, fps: int = 30):
+def animate_projectile_motion(projectiles: list[Projectile], motion_data: list[MotionData], fps: int = 30):
     fig, ax = plt.subplots()
-    setup_projectile_plot(ax, projectile, motion_data)
+    setup_projectile_plot(ax, projectiles, motion_data)
 
     # Moving point
     point = ax.scatter(motion_data.x[0], motion_data.y[0], c='k', s=5, label='Current Position')
