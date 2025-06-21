@@ -1,4 +1,6 @@
-from projectile_tools import Projectile, plot_projectile_motion
+from matplotlib import pyplot as plt
+
+from projectile_tools import Projectile, plot_projectile_motion, animate_projectile_motion
 
 projectiles = [
     Projectile(
@@ -41,5 +43,8 @@ all_position_data = [
     projectiles
 ]
 
-# animate_projectile_motion([car], all_position_data, fps=simulation_fps)
-plot_projectile_motion(projectiles, all_position_data, colors, plot_steps=False)
+# Display the results
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+plot_projectile_motion(projectiles, all_position_data, colors, plot_steps=False, ax=ax1)
+anim = animate_projectile_motion(projectiles, all_position_data, colors, 30, ax=ax2)
+plt.show()

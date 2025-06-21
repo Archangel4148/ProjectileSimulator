@@ -61,12 +61,14 @@ def setup_projectile_plot(ax, projectiles: list[Projectile], motion_data: list[M
     ax.set_ylabel("y (m)")
     ax.set_title(f"Motion of {projectiles[0].name if len(projectiles) == 1 else 'Projectiles'}")
     ax.grid(True)
-    ax.legend()
 
 
 def plot_projectile_motion(projectiles: list[Projectile], motion_data: list[MotionData], colors: list[str],
-                           plot_steps: bool = False):
-    fig, ax = plt.subplots()
+                           plot_steps: bool = False, ax=None):
+    # Set up the plot (or use the provided one)
+    if ax is None:
+        fig, ax = plt.subplots()
+
     setup_projectile_plot(ax, projectiles, motion_data)
     # Trajectory
     for i, projectile in enumerate(projectiles):
@@ -83,43 +85,63 @@ def plot_projectile_motion(projectiles: list[Projectile], motion_data: list[Moti
         ax.scatter(motion_data[i].peak[0], motion_data[i].peak[1], color=colors[i], marker='^',
                    label=f"{projectile.name} Peak Height")
 
-    plt.legend()
-    plt.show()
+    ax.legend()
 
 
-def animate_projectile_motion(projectiles: list[Projectile], motion_data: list[MotionData], fps: int = 30):
-    fig, ax = plt.subplots()
+def animate_projectile_motion(projectiles: list[Projectile], motion_data: list[MotionData],
+                              colors: list[str], fps: int = 30, duration_s: float | None = None, ax=None):
+    # Set up the plot
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
     setup_projectile_plot(ax, projectiles, motion_data)
 
-    # Moving point
-    point = ax.scatter(motion_data.x[0], motion_data.y[0], c='k', s=5, label='Current Position')
-    # Trajectory line
-    trace, = ax.plot([], [], 'k--', linewidth=1, alpha=0.5)
+    points = []  # moving points
+    traces = []  # path lines
 
-    # Total animation frames based on desired fps and simulated time
-    total_time = motion_data.t[-1] - motion_data.t[0]  # in seconds
-    total_frames = int(total_time * fps)
-    interval_ms = int(1000 / fps)
+    # Pre-create plot elements
+    for i, data in enumerate(motion_data):
+        point = ax.scatter([], [], color=colors[i], s=30, label=projectiles[i].name)
+        trace, = ax.plot([], [], linestyle='--', color=colors[i], alpha=0.5)
+        points.append(point)
+        traces.append(trace)
 
-    # Evenly spaced indices for animation frames
-    indices = np.linspace(0, len(motion_data.t) - 1, total_frames, dtype=int)
+    ax.legend()
 
-    def update(i: int):
-        idx = indices[i]
-        x = motion_data.x[:idx + 1]
-        y = motion_data.y[:idx + 1]
+    # Get total frame count
+    if duration_s is None:
+        duration_s = max(md.t[-1] for md in motion_data)
+    total_frames = int(duration_s * fps)
 
-        point.set_offsets(np.column_stack((x[-1:], y[-1:])))
-        trace.set_data(x, y)
-        return point, trace
+    def init():
+        # This gets called when the animation starts
+        for point, trace in zip(points, traces):
+            # Clear the plot for each projectile
+            point.set_offsets(np.empty((0, 2)))
+            trace.set_data([], [])
+        return points + traces
 
-    ani = animation.FuncAnimation(
-        fig=fig,
-        func=update,
-        frames=len(indices),
-        interval=interval_ms,
-        blit=True,
-        repeat=False
-    )
+    def update(frame):
+        time = frame / fps
+        for i, md in enumerate(motion_data):
+            # Get the projectile motion data
+            t_arr = np.array(md.t)
+            x_arr = np.array(md.x)
+            y_arr = np.array(md.y)
 
-    plt.show()
+            # Get all steps up to the current frame time
+            mask = t_arr <= time
+            if mask.any():
+                # Update each point/line to the current position
+                points[i].set_offsets([x_arr[mask][-1], y_arr[mask][-1]])
+                traces[i].set_data(x_arr[mask], y_arr[mask])
+        return points + traces
+
+    # Create the animation (update gets called each frame, init gets called on start, interval makes it match fps)
+    # (This is stored in a variable to keep it from being garbage collected)
+    anim = animation.FuncAnimation(fig, update, init_func=init, frames=total_frames,
+                                interval=1000 / fps, blit=False)
+
+    # Return the animation to keep it alive
+    return anim
