@@ -36,6 +36,8 @@ colors = ["red", "blue", "green"]
 # Time constants
 simulation_steps = 200
 simulation_time = 2
+animation_fps = 30
+plot_steps = True
 
 # Simulate projectile motion and store data
 all_position_data = [
@@ -45,6 +47,6 @@ all_position_data = [
 
 # Display the results
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-plot_projectile_motion(projectiles, all_position_data, colors, plot_steps=False, ax=ax1)
-anim = animate_projectile_motion(projectiles, all_position_data, colors, 30, ax=ax2)
+plot_projectile_motion(projectiles, all_position_data, colors, plot_steps=plot_steps, ax=ax1)
+anim = animate_projectile_motion(projectiles, all_position_data, colors, animation_fps, ax=ax2)
 plt.show()

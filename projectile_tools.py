@@ -74,7 +74,7 @@ def plot_projectile_motion(projectiles: list[Projectile], motion_data: list[Moti
     for i, projectile in enumerate(projectiles):
         ax.plot(motion_data[i].x, motion_data[i].y, color='black')
         if plot_steps:
-            plt.scatter(motion_data[i].x, motion_data[i].y, color='black', s=3)
+            ax.scatter(motion_data[i].x, motion_data[i].y, color='black', s=3)
 
     # Landmarks
     for i, projectile in enumerate(projectiles):
