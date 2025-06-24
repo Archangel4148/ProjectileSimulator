@@ -12,15 +12,15 @@ projectiles = [
     #     a_x=0,
     #     a_y=-9.8,
     # ),
-    # Projectile(
-    #     name="Wrench",
-    #     x_0=0,
-    #     y_0=0,
-    #     v_x0=20,
-    #     v_y0=3,
-    #     a_x=0,
-    #     a_y=-9.8,
-    # ),
+    Projectile(
+        name="Wrench",
+        x_0=0,
+        y_0=0,
+        v_x0=20,
+        v_y0=3,
+        a_x=0,
+        a_y=-9.8,
+    ),
     Projectile(
         name="Josh",
         x_0=20,
@@ -38,7 +38,7 @@ simulation_steps = 200
 simulation_time = 2
 animation_fps = 30
 plot_steps = False
-show_animation = False
+show_animation = True
 
 # Simulate projectile motion and store data
 all_position_data = [

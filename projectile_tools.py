@@ -7,10 +7,9 @@ from matplotlib import animation
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
 class MotionData:
-    x: list[float]
-    y: list[float]
-    t: list[float]
-    t_f: float
+    x: np.ndarray
+    y: np.ndarray
+    t: np.ndarray
     peak: tuple[float, float]
 
 
@@ -40,23 +39,21 @@ class Projectile:
         _, peak = max(enumerate(position_data), key=lambda item: item[1][1])
 
         return MotionData(
-            x=[x for x, _ in position_data],
-            y=[y for _, y in position_data],
-            t=time_data.tolist(),
-            t_f=float(t_f),
+            x=np.array([x for x, _ in position_data]),
+            y=np.array([y for _, y in position_data]),
+            t=time_data,
             peak=(peak[0], peak[1]),
         )
 
 
 def setup_projectile_plot(ax, projectiles: list[Projectile], motion_data: list[MotionData]):
-    # Find min/max bounds for plot
-    max_x = max(max(data.x) for data in motion_data)
-    min_x = min(min(data.x) for data in motion_data)
-    max_y = max(max(data.y) for data in motion_data)
-    min_y = min(min(data.y) for data in motion_data)
+    # Find and set min/max bounds for all plotted data
+    all_x = np.concatenate([data.x for data in motion_data])
+    all_y = np.concatenate([data.y for data in motion_data])
+    ax.set_xlim(all_x.min() - all_x.max() * 0.1, all_x.max() * 1.1)
+    ax.set_ylim(all_y.min() - all_y.max() * 0.1, all_y.max() * 1.1)
 
-    ax.set_xlim(min_x - max_x * 0.1, max_x * 1.1)
-    ax.set_ylim(min_y - max_y * 0.1, max_y * 1.1)
+    # Labels, title, and grid
     ax.set_xlabel("x (m)")
     ax.set_ylabel("y (m)")
     ax.set_title(f"Motion of {projectiles[0].name if len(projectiles) == 1 else 'Projectiles'}")
@@ -66,8 +63,7 @@ def setup_projectile_plot(ax, projectiles: list[Projectile], motion_data: list[M
 def plot_projectile_motion(projectiles: list[Projectile], motion_data: list[MotionData], colors: list[str],
                            plot_steps: bool = False, ax=None):
     # Set up the plot (or use the provided one)
-    if ax is None:
-        fig, ax = plt.subplots()
+    fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
 
     setup_projectile_plot(ax, projectiles, motion_data)
     # Trajectory
@@ -91,10 +87,8 @@ def plot_projectile_motion(projectiles: list[Projectile], motion_data: list[Moti
 def animate_projectile_motion(projectiles: list[Projectile], motion_data: list[MotionData],
                               colors: list[str], fps: int = 30, duration_s: float | None = None, ax=None):
     # Set up the plot
-    if ax is None:
-        fig, ax = plt.subplots()
-    else:
-        fig = ax.figure
+    fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
+
     setup_projectile_plot(ax, projectiles, motion_data)
 
     points = []  # moving points
@@ -111,37 +105,33 @@ def animate_projectile_motion(projectiles: list[Projectile], motion_data: list[M
 
     # Get total frame count
     if duration_s is None:
-        duration_s = max(md.t[-1] for md in motion_data)
+        duration_s = max([float(md.t[-1]) for md in motion_data])
     total_frames = int(duration_s * fps)
 
     def init():
         # This gets called when the animation starts
+        empty_array = np.empty((0, 2))
         for point, trace in zip(points, traces):
             # Clear the plot for each projectile
-            point.set_offsets(np.empty((0, 2)))
+            point.set_offsets(empty_array)
             trace.set_data([], [])
         return points + traces
 
     def update(frame):
         time = frame / fps
         for i, md in enumerate(motion_data):
-            # Get the projectile motion data
-            t_arr = np.array(md.t)
-            x_arr = np.array(md.x)
-            y_arr = np.array(md.y)
-
             # Get all steps up to the current frame time
-            mask = t_arr <= time
+            mask = md.t <= time
             if mask.any():
                 # Update each point/line to the current position
-                points[i].set_offsets([x_arr[mask][-1], y_arr[mask][-1]])
-                traces[i].set_data(x_arr[mask], y_arr[mask])
+                points[i].set_offsets([md.x[mask][-1], md.y[mask][-1]])
+                traces[i].set_data(md.x[mask], md.y[mask])
         return points + traces
 
     # Create the animation (update gets called each frame, init gets called on start, interval makes it match fps)
     # (This is stored in a variable to keep it from being garbage collected)
     anim = animation.FuncAnimation(fig, update, init_func=init, frames=total_frames,
-                                interval=1000 / fps, blit=False)
+                                   interval=1000 / fps, blit=True)
 
     # Return the animation to keep it alive
     return anim
