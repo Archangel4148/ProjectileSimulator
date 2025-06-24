@@ -8,8 +8,6 @@ class Projectile:
     y_0: float
     v_x0: float
     v_y0: float
-    a_x: float
-    a_y: float
 
 
 @dataclasses.dataclass(kw_only=True, frozen=True)

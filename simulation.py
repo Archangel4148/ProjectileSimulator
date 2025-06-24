@@ -2,6 +2,7 @@ import dataclasses
 
 import numpy as np
 from matplotlib import pyplot as plt, animation
+from scipy.integrate import solve_ivp
 
 from constants import Projectile, Environment
 
@@ -19,25 +20,49 @@ class ProjectileSimulation:
         self.projectile = projectile
         self.environment = environment
 
-    def simulate(self, duration: float, time_step: float) -> SimulationResult:
-        position_data = []
-        time_data = np.arange(0, duration + time_step, time_step)
+    def simulate(self, duration: float, dt: float) -> SimulationResult:
+        p, env = self.projectile, self.environment
 
-        for nt in time_data:
-            t = float(nt)
-            x = self.projectile.x_0 + self.projectile.v_x0 * t + 0.5 * self.projectile.a_x * t ** 2
-            y = self.projectile.y_0 + self.projectile.v_y0 * t + 0.5 * self.projectile.a_y * t ** 2
-            position_data.append((x, max(y, self.environment.min_height)))
+        t_eval = np.arange(0, duration + dt, dt)
 
-        # Find the peak coordinates
-        _, peak = max(enumerate(position_data), key=lambda item: item[1][1])
+        result = solve_ivp(
+            fun=lambda t, y: motion_equations(t, y, p, env),
+            t_span=(0, duration),
+            y0=[p.x_0, p.y_0, p.v_x0, p.v_y0],
+            t_eval=t_eval,
+            method='RK45',
+            rtol=1e-8,
+            atol=1e-10
+        )
+
+        x = result.y[0]
+        y = result.y[1]
+
+        # Clamp to min height and stop where it hits the ground
+        ground_idx = np.argmax(y < env.min_height)
+        if ground_idx > 0:
+            x = x[:ground_idx]
+            y = y[:ground_idx]
+            t_eval = t_eval[:ground_idx]
+
+        peak_idx = np.argmax(y)
 
         return SimulationResult(
-            x=np.array([x for x, _ in position_data]),
-            y=np.array([y for _, y in position_data]),
-            t=time_data,
-            peak=(peak[0], peak[1]),
+            x=x,
+            y=y,
+            t=t_eval,
+            peak=(x[peak_idx], y[peak_idx])
         )
+
+
+def motion_equations(t, state, projectile: Projectile, env: Environment):
+    x, y, vx, vy = state
+
+    # Gravity only for now
+    ax = 0
+    ay = -env.grav_acc
+
+    return [vx, vy, ax, ay]
 
 
 def setup_projectile_plot(ax, projectiles: list[Projectile], simulation_data: list[SimulationResult]):

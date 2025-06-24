@@ -4,23 +4,19 @@ from constants import Projectile, Environment
 from simulation import ProjectileSimulation, plot_projectile_motion, animate_projectile_motion
 
 projectiles = [
-    # Projectile(
-    #     name="Ball",
-    #     x_0=0,
-    #     y_0=0,
-    #     v_x0=20,
-    #     v_y0=5,
-    #     a_x=0,
-    #     a_y=-9.8,
-    # ),
+    Projectile(
+        name="Ball",
+        x_0=0,
+        y_0=0,
+        v_x0=20,
+        v_y0=5,
+    ),
     Projectile(
         name="Wrench",
         x_0=0,
         y_0=0,
         v_x0=20,
         v_y0=3,
-        a_x=0,
-        a_y=-9.8,
     ),
     Projectile(
         name="Josh",
@@ -28,8 +24,6 @@ projectiles = [
         y_0=1,
         v_x0=-40,
         v_y0=1,
-        a_x=0,
-        a_y=-9.8,
     ),
 ]
 environment = Environment(
