@@ -1,6 +1,6 @@
 from matplotlib import pyplot as plt
 
-from projectile_tools import Projectile, Environment
+from constants import Projectile, Environment
 from simulation import ProjectileSimulation, plot_projectile_motion, animate_projectile_motion
 
 projectiles = [

@@ -3,7 +3,7 @@ import dataclasses
 import numpy as np
 from matplotlib import pyplot as plt, animation
 
-from projectile_tools import Projectile, Environment
+from constants import Projectile, Environment
 
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
