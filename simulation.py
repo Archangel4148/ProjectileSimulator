@@ -31,7 +31,7 @@ class ProjectileSimulation:
         result = solve_ivp(
             fun=lambda t, y: self.motion_equations(t, y),
             t_span=(0, duration),
-            y0=[p.x_0, p.y_0, p.v_x0, p.v_y0, p.theta, 0.0],
+            y0=[p.x_0, p.y_0, p.v_x0, p.v_y0, p.theta, p.omega],
             t_eval=t_eval,
             method='RK45',
             rtol=1e-8,
@@ -56,7 +56,7 @@ class ProjectileSimulation:
             y=y,
             t=t_eval,
             theta=theta,
-            peak=(x[peak_idx], y[peak_idx])
+            peak=(x[peak_idx], y[peak_idx]),
         )
 
     def calculate_acceleration(self, t: float, x: float, y: float, vx: float, vy: float, theta: float) -> tuple[
@@ -71,11 +71,46 @@ class ProjectileSimulation:
 
         # Thrust (Only during thrust period)
         if p.thrust_start <= t <= p.thrust_end:
-            sum_fx += p.thrust * np.cos(theta)
-            sum_fy += p.thrust * np.sin(theta)
+            thrust_x = p.thrust * np.cos(theta)
+            thrust_y = p.thrust * np.sin(theta)
+            sum_fx += thrust_x
+            sum_fy += thrust_y
+            print(f"Thrust: {thrust_x}, {thrust_y}")
+
+        # Drag
+        air_density = env.air_density_model(y)
+        speed = np.hypot(vx, vy)
+
+        if speed > 0:
+            # Calculate drag force as long as the projectile is moving
+            drag_force = 0.5 * air_density * speed ** 2 * p.drag_coefficient * p.cross_sectional_area
+            sum_fx -= drag_force * vx / speed
+            sum_fy -= drag_force * vy / speed
 
         # Solve for acceleration
         return sum_fx / p.mass, sum_fy / p.mass
+
+    def calculate_angular_acceleration(self, torque: float) -> float:
+        # Solve for angular acceleration
+        moi = self.projectile.moment_of_inertia
+        return torque / moi
+
+    def calculate_torque(self, t: float, x: float, y: float, vx: float, vy: float, theta: float) -> float:
+        p, env = self.projectile, self.environment
+        sum_torque = 0.0
+
+        # Torque from drag
+        speed = np.hypot(vx, vy)
+        if speed > 0:
+            # Drag force magnitude
+            drag_mag = 0.5 * env.air_density_model(y) * speed ** 2 * p.drag_coefficient * p.cross_sectional_area
+
+            # Angle between velocity and orientation
+            vel_angle = np.arctan2(vy, vx)
+            angle_diff = vel_angle - theta
+            sum_torque += drag_mag * p.r_drag * np.sin(angle_diff)
+
+        return sum_torque
 
     def motion_equations(self, t, state):
         x, y, vx, vy, theta, omega = state
@@ -84,7 +119,7 @@ class ProjectileSimulation:
         ax, ay = self.calculate_acceleration(t, x, y, vx, vy, theta)
 
         # Angular acceleration
-        alpha = 0.0
+        alpha = self.calculate_angular_acceleration(self.calculate_torque(t, x, y, vx, vy, theta))
 
         return [vx, vy, ax, ay, omega, alpha]
 
@@ -93,14 +128,23 @@ class ProjectileSimulation:
 
 
 # ===================== PLOTTING/VISUALIZATION =====================
-def setup_projectile_plot(ax, projectiles: list[Projectile], simulation_data: list[SimulationResult]):
+def setup_projectile_plot(ax, projectiles: list[Projectile], simulation_data: list[SimulationResult],
+                          bounds_override: dict[str, int] | None = None):
     # Find and set min/max bounds for all plotted data (with padding)
     all_x = np.concatenate([data.x for data in simulation_data])
     all_y = np.concatenate([data.y for data in simulation_data])
-    x_padding = 0.1 * (all_x.max() - all_x.min())
-    y_padding = 0.1 * (all_y.max() - all_y.min())
-    ax.set_xlim(all_x.min() - x_padding, all_x.max() + x_padding)
-    ax.set_ylim(all_y.min() - y_padding, all_y.max() + y_padding)
+    x_range, y_range = all_x.max() - all_x.min(), all_y.max() - all_y.min()
+    x_padding = 0.1 * x_range if x_range > 0 else 1
+    y_padding = 0.1 * y_range if y_range > 0 else 1
+
+    if bounds_override is not None:
+        # User-defined bounds
+        ax.set_xlim(bounds_override["x"])
+        ax.set_ylim(bounds_override["y"])
+    else:
+        # Automatically fit bounds to data
+        ax.set_xlim(all_x.min() - x_padding, all_x.max() + x_padding)
+        ax.set_ylim(all_y.min() - y_padding, all_y.max() + y_padding)
 
     # Labels, title, and grid
     ax.set_xlabel("x (m)")
@@ -110,11 +154,11 @@ def setup_projectile_plot(ax, projectiles: list[Projectile], simulation_data: li
 
 
 def plot_projectile_motion(projectiles: list[Projectile], simulation_data: list[SimulationResult], colors: list[str],
-                           plot_steps: bool = False, ax=None):
+                           plot_steps: bool = False, bounds_override: dict[str, int] | None = None, ax=None):
     # Set up the plot (or use the provided one)
     fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
 
-    setup_projectile_plot(ax, projectiles, simulation_data)
+    setup_projectile_plot(ax, projectiles, simulation_data, bounds_override)
     # Trajectory
     for i, projectile in enumerate(projectiles):
         ax.plot(simulation_data[i].x, simulation_data[i].y, color='black')
@@ -129,16 +173,34 @@ def plot_projectile_motion(projectiles: list[Projectile], simulation_data: list[
                    label=f"{projectile.name} Final Position", zorder=3)
         ax.scatter(simulation_data[i].peak[0], simulation_data[i].peak[1], color=colors[i], marker='^',
                    label=f"{projectile.name} Peak Height", zorder=3)
+        # Find index closest to thrust start time
+        idx_start = (np.abs(simulation_data[i].t - projectile.thrust_start)).argmin()
+        ax.scatter(simulation_data[i].x[idx_start], simulation_data[i].y[idx_start], color='green', marker='>', s=80,
+                   label=f"{projectile.name} Thrust On", zorder=4)
+
+        # Find index closest to thrust end time
+        idx_end = (np.abs(simulation_data[i].t - projectile.thrust_end)).argmin()
+        ax.scatter(simulation_data[i].x[idx_end], simulation_data[i].y[idx_end], color='red', marker='<', s=80,
+                   label=f"{projectile.name} Thrust Off", zorder=4)
 
     ax.legend()
+    # Ensure legend is unique
+    handles, labels = ax.get_legend_handles_labels()
+    unique = dict(zip(labels, handles))
+    ax.legend(unique.values(), unique.keys())
 
 
-def animate_projectile_motion(projectiles: list[Projectile], simulation_data: list[SimulationResult],
-                              colors: list[str], fps: int = 30, duration_s: float | None = None, ax=None):
+def animate_projectile_motion(
+        projectiles: list[Projectile], simulation_data: list[SimulationResult],
+        colors: list[str], fps: int = 30,
+        bounds_override: dict[str, int] | None = None,
+        duration_s: float | None = None,
+        ax=None
+):
     # Set up the plot
     fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
 
-    setup_projectile_plot(ax, projectiles, simulation_data)
+    setup_projectile_plot(ax, projectiles, simulation_data, bounds_override)
 
     points = []  # moving points
     traces = []  # path lines
@@ -156,7 +218,7 @@ def animate_projectile_motion(projectiles: list[Projectile], simulation_data: li
         points.append(point)
         traces.append(trace)
         # Orientation lines
-        line = Line2D([], [], color=colors[i], linestyle='-', linewidth=1)
+        line = Line2D([], [], color="black", linestyle='-', linewidth=1)
         ax.add_line(line)
         orientations.append(line)
 
@@ -177,22 +239,29 @@ def animate_projectile_motion(projectiles: list[Projectile], simulation_data: li
         return points + traces
 
     def update(frame):
-        true_frame = min(frame, len(simulation_data[0].t) - 1)
-        time = true_frame / fps
         for i, md in enumerate(simulation_data):
-            # Get all steps up to the current frame time
-            mask = md.t <= time
-            if mask.any():
-                # Update each point/line to the current position
-                points[i].set_offsets([md.x[mask][-1], md.y[mask][-1]])
-                traces[i].set_data(md.x[mask], md.y[mask])
-                # Update orientation line
-                theta = simulation_data[i].theta[mask][-1]
-                length = 1.0
-                x_pos, y_pos = md.x[mask][-1], md.y[mask][-1]
-                x_end = x_pos + length * np.cos(theta)
-                y_end = y_pos + length * np.sin(theta)
-                orientations[i].set_data([x_pos, x_end], [y_pos, y_end])
+            # Clamp to the last valid frame to prevent IndexError
+            true_frame = min(frame, len(md.t) - 1)
+
+            # Get current position and orientation
+            x_pos = md.x[true_frame]
+            y_pos = md.y[true_frame]
+            theta = md.theta[true_frame]
+
+            # Update the moving point
+            points[i].set_offsets([x_pos, y_pos])
+
+            # Update the trace (all points up to current frame)
+            traces[i].set_data(md.x[:true_frame + 1], md.y[:true_frame + 1])
+
+            # Update the orientation line
+            x_lim, y_lim = ax.get_xlim(), ax.get_ylim()
+            x_range, y_range = x_lim[1] - x_lim[0], y_lim[1] - y_lim[0]
+            diagonal = np.hypot(x_range, y_range)
+            length = 0.05 * diagonal  # Scale to 5% of the diagonal, so you can see it
+            x_end = x_pos + length * np.cos(theta)
+            y_end = y_pos + length * np.sin(theta)
+            orientations[i].set_data([x_pos, x_end], [y_pos, y_end])
 
         return points + traces + orientations
 
